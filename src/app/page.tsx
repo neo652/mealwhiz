@@ -14,8 +14,9 @@ import Loading from './loading';
 import { getMealItems, saveMealItems } from '@/services/meal-items';
 import { getLatestMealPlan, saveMealPlan } from '@/services/meal-plan';
 import { differenceInDays, startOfToday } from 'date-fns';
+import { useAuth } from '@/hooks/use-auth';
 
-export default function MealWhizPage() {
+function MealWhizContent() {
   const { toast } = useToast();
   const [mealItems, setMealItems] = React.useState<MealItems | null>(null);
   const [mealPlan, setMealPlan] = React.useState<MealPlan | null>(null);
@@ -23,7 +24,6 @@ export default function MealWhizPage() {
     null
   );
 
-  const [isClient, setIsClient] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
   const [isUpdatingMeal, setIsUpdatingMeal] = React.useState<{
@@ -80,7 +80,6 @@ export default function MealWhizPage() {
   }, [handleSavePlan, toast]);
 
   React.useEffect(() => {
-    setIsClient(true);
     async function loadInitialData() {
       setIsLoading(true);
       const items = await getMealItems();
@@ -162,12 +161,11 @@ export default function MealWhizPage() {
         title: 'Save Error',
         description: 'Could not save your meal list. Please try again.',
       });
-      const oldItems = await getMealItems();
-      setMealItems(oldItems);
+      console.error("Error saving meal items, could not revert.", error);
     }
   };
   
-  if (!isClient || isLoading || !mealItems || !mealPlan) {
+  if (isLoading || !mealItems || !mealPlan) {
     return <Loading />;
   }
 
@@ -198,4 +196,14 @@ export default function MealWhizPage() {
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+export default function MealWhizPage() {
+    const { user, loading: authLoading } = useAuth();
+
+    if (authLoading || !user) {
+        return <Loading />;
+    }
+
+    return <MealWhizContent />;
 }
