@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { suggestNewMealPlan } from '@/ai/flows/suggest-new-meal-plan';
 import { updateSingleMeal } from '@/ai/flows/update-single-meal';
-import type { MealItems, MealPlan, MealType } from '@/lib/types';
+import type { DailyPlan, MealItems, MealPlan, MealType } from '@/lib/types';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Header } from '@/components/Header';
 import { MealPlanDisplay } from '@/components/MealPlanDisplay';
@@ -47,14 +47,16 @@ export default function MealWhizPage() {
   const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
     setIsGeneratingPlan(true);
     try {
+      const newStartDate = startOfToday();
       const newPlan = await suggestNewMealPlan({
         breakfastItems: currentMealItems.Breakfast,
         lunchItems: currentMealItems.Lunch,
         dinnerItems: currentMealItems.Dinner,
         snackItems: currentMealItems.Snack,
         numberOfDays: 14,
+        startDate: newStartDate.toISOString(),
       });
-      const newStartDate = startOfToday();
+      
       setMealPlan(newPlan);
       setPlanStartDate(newStartDate.toISOString());
       await handleSavePlan(newPlan, newStartDate);
@@ -86,7 +88,7 @@ export default function MealWhizPage() {
       
       const storedPlanData = await getLatestMealPlan();
 
-      if (!storedPlanData || storedPlanData.plan.length === 0 || !storedPlanData.startDate) {
+      if (!storedPlanData || storedPlanData.plan.length < 14) {
         await handleGenerateNewPlan(items, true); 
       } else {
         setMealPlan(storedPlanData.plan);
@@ -121,7 +123,12 @@ export default function MealWhizPage() {
         });
 
         setMealPlan(updatedPlan);
-        await handleSavePlan(updatedPlan, new Date(planStartDate));
+        const dailyPlanToSave = updatedPlan.find(p => p.date === mealPlan[dayIndex].date);
+
+        if (dailyPlanToSave) {
+             await saveMealPlan({ plan: [dailyPlanToSave], startDate: new Date(dailyPlanToSave.date).toISOString() });
+        }
+       
 
         toast({
           title: `${mealType} Updated!`,
@@ -138,7 +145,7 @@ export default function MealWhizPage() {
         setIsUpdatingMeal(null);
       }
     },
-    [mealItems, mealPlan, planStartDate, toast, handleSavePlan]
+    [mealItems, mealPlan, planStartDate, toast]
   );
 
   const handleMealItemsChange = async (newItems: MealItems) => {

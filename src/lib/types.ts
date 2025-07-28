@@ -3,6 +3,7 @@ export type Meal = string;
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
 export interface DailyPlan {
+  date: string; // YYYY-MM-DD
   Breakfast: Meal;
   Lunch: Meal;
   Dinner: Meal;

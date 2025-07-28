@@ -16,6 +16,7 @@ const MealSchema = z.string().describe('A food item for a meal.');
 const MealTypeSchema = z.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']).describe('The type of meal.');
 
 const DailyMealPlanSchema = z.object({
+  date: z.string().describe('The date of the meal plan in YYYY-MM-DD format.'),
   Breakfast: MealSchema,
   Lunch: MealSchema,
   Dinner: MealSchema,
@@ -94,7 +95,9 @@ const updateSingleMealFlow = ai.defineFlow(
           mealType: mealType,
           availableMeals: filteredMeals.length > 0 ? filteredMeals : availableMeals,
         });
-        newMeal = output;
+        if (output) {
+          newMeal = output;
+        }
     } catch (e) {
         console.error("Error getting meal suggestion from AI, using fallback.", e);
         // Error is expected if model returns nothing, so we'll fall through to the fallback.

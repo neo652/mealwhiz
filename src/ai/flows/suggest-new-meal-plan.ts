@@ -8,6 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import { addDays, format } from 'date-fns';
 import {z} from 'genkit';
 
 const SuggestNewMealPlanInputSchema = z.object({
@@ -16,10 +17,12 @@ const SuggestNewMealPlanInputSchema = z.object({
   dinnerItems: z.array(z.string()).describe('List of dinner items.'),
   snackItems: z.array(z.string()).describe('List of snack items.'),
   numberOfDays: z.number().default(14).describe('Number of days for the meal plan.'),
+  startDate: z.string().describe('The start date for the meal plan in ISO format.'),
 });
 export type SuggestNewMealPlanInput = z.infer<typeof SuggestNewMealPlanInputSchema>;
 
 const DailyMealPlanSchema = z.object({
+    date: z.string().describe('The date for this meal plan in YYYY-MM-DD format.'),
     Breakfast: z.string().describe('Suggested breakfast item for the day.'),
     Lunch: z.string().describe('Suggested lunch item for the day.'),
     Dinner: z.string().describe('Suggested dinner item for the day.'),
@@ -37,10 +40,21 @@ export async function suggestNewMealPlan(input: SuggestNewMealPlanInput): Promis
 const suggestNewMealPlanPrompt = ai.definePrompt({
   name: 'suggestNewMealPlanPrompt',
   input: {
-    schema: SuggestNewMealPlanInputSchema,
+    schema: z.object({
+        breakfastItems: z.array(z.string()),
+        lunchItems: z.array(z.string()),
+        dinnerItems: z.array(z.string()),
+        snackItems: z.array(z.string()),
+        numberOfDays: z.number(),
+    })
   },
   output: {
-    schema: SuggestNewMealPlanOutputSchema,
+    schema: z.array(z.object({
+        Breakfast: z.string().describe('Suggested breakfast item for the day.'),
+        Lunch: z.string().describe('Suggested lunch item for the day.'),
+        Dinner: z.string().describe('Suggested dinner item for the day.'),
+        Snack: z.string().describe('Suggested snack item for the day.'),
+    })),
   },
   prompt: `You are a meal planning assistant. Generate a {{numberOfDays}}-day meal plan.
 
@@ -60,8 +74,27 @@ const suggestNewMealPlanFlow = ai.defineFlow(
     inputSchema: SuggestNewMealPlanInputSchema,
     outputSchema: SuggestNewMealPlanOutputSchema,
   },
-  async input => {
-    const {output} = await suggestNewMealPlanPrompt(input);
-    return output!;
+  async (input) => {
+    const { output } = await suggestNewMealPlanPrompt({
+        breakfastItems: input.breakfastItems,
+        lunchItems: input.lunchItems,
+        dinnerItems: input.dinnerItems,
+        snackItems: input.snackItems,
+        numberOfDays: input.numberOfDays,
+    });
+    if (!output) {
+      throw new Error('Failed to generate meal plan.');
+    }
+
+    const startDate = new Date(input.startDate);
+    const datedPlan = output.map((day, index) => {
+      const date = addDays(startDate, index);
+      return {
+        ...day,
+        date: format(date, 'yyyy-MM-dd'),
+      };
+    });
+
+    return datedPlan;
   }
 );
