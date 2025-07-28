@@ -116,6 +116,7 @@ function MealWhizContent() {
     async function loadData() {
         if (!user) return; 
 
+        setIsLoading(true);
         try {
             const items = await getMealItems();
             setMealItems(items);
@@ -124,8 +125,10 @@ function MealWhizContent() {
             if (storedPlanData && storedPlanData.plan.length > 0) {
                 setMealPlan(storedPlanData.plan);
                 setPlanStartDate(storedPlanData.startDate);
+            } else {
+                // Explicitly set to null if no plan is found to show welcome screen.
+                setMealPlan(null);
             }
-            // If there's no stored plan, we now wait for the user to click the button on the Welcome Screen.
         } catch (error) {
             console.error("Error during initial data load:", error);
             toast({
@@ -137,8 +140,10 @@ function MealWhizContent() {
             setIsLoading(false);
         }
     }
-    loadData();
-  }, [user, toast]);
+    if (!authLoading) {
+      loadData();
+    }
+  }, [user, authLoading, toast]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
