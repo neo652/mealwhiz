@@ -1,8 +1,8 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+// src/lib/firebase.ts
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth'; // Import auth functions
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   "projectId": "mealwhiz-fr88z",
   "appId": "1:151289399985:web:d5aed2e017ff755a98f090",
@@ -12,6 +12,29 @@ const firebaseConfig = {
   "messagingSenderId": "151289399985"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+const db = getFirestore(app);
+const auth = getAuth(app); // Get the auth instance
+
+// Sign in anonymously when the app initializes
+signInAnonymously(auth)
+  .then(() => {
+    console.log("Signed in anonymously");
+  })
+  .catch((error) => {
+    console.error("Error signing in anonymously:", error);
+  });
+
+// Listen for auth state changes (optional, but good practice)
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // User is signed in (including anonymous)
+    console.log("Auth state changed: User is signed in", user.uid);
+  } else {
+    // User is signed out
+    console.log("Auth state changed: No user signed in");
+  }
+});
+
+
+export { db, auth }; // Export auth instance
