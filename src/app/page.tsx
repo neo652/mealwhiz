@@ -33,7 +33,6 @@ function MealWhizContent() {
 
   const handleSavePlan = React.useCallback(async (plan: MealPlan, startDate: Date) => {
     if (!user) {
-        // This should not happen if the UI is disabled correctly, but as a safeguard.
         console.warn("Save requested, but user is not authenticated.");
         return;
     }
@@ -90,13 +89,13 @@ function MealWhizContent() {
 
   React.useEffect(() => {
     async function loadData() {
-        if (authLoading) return; // Wait for authentication to resolve.
+        if (!user) return; // Wait for user to be available
 
         setIsLoading(true);
-        const items = await getMealItems();
-        setMealItems(items);
+        try {
+            const items = await getMealItems();
+            setMealItems(items);
 
-        if (user) {
             const storedPlanData = await getLatestMealPlan();
             if ((!storedPlanData || storedPlanData.plan.length < 14)) {
                 await handleGenerateNewPlan(items, true);
@@ -104,11 +103,19 @@ function MealWhizContent() {
                 setMealPlan(storedPlanData.plan);
                 setPlanStartDate(storedPlanData.startDate);
             }
+        } catch (error) {
+            console.error("Error during initial data load:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Loading Error',
+                description: 'Could not load your data. Please refresh the page.',
+            });
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }
     loadData();
-  }, [user, authLoading, handleGenerateNewPlan]);
+  }, [user, handleGenerateNewPlan, toast]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
@@ -176,13 +183,15 @@ function MealWhizContent() {
     }
   };
   
-  if (authLoading || isLoading) {
+  if (authLoading || (isLoading && !mealPlan)) {
     return <Loading />;
   }
 
   const todayIndex = planStartDate
     ? differenceInDays(startOfToday(), new Date(planStartDate))
     : -1;
+
+  const isDataReady = !authLoading && !isLoading && mealItems && mealPlan;
 
   return (
     <SidebarProvider>
@@ -191,7 +200,7 @@ function MealWhizContent() {
         <div className="flex flex-col min-h-screen">
           <Header
             onNewPlanClick={() => mealItems && handleGenerateNewPlan(mealItems)}
-            loading={isGeneratingPlan || !user}
+            loading={isGeneratingPlan || !isDataReady}
           />
           <main className="flex-1 p-4 md:p-6">
             {mealPlan ? (
@@ -201,7 +210,7 @@ function MealWhizContent() {
                 todayIndex={todayIndex}
                 onUpdateMeal={handleUpdateSingleMeal}
                 updatingMeal={isUpdatingMeal}
-                loading={isGeneratingPlan || isLoading || !user}
+                loading={isGeneratingPlan || isLoading || authLoading}
               />
             ) : (
                 <div className="flex items-center justify-center h-64 bg-secondary rounded-lg">
@@ -221,5 +230,3 @@ function MealWhizContent() {
 export default function MealWhizPage() {
     return <MealWhizContent />;
 }
-
-    
