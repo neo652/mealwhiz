@@ -5,7 +5,6 @@ import * as React from 'react';
 import { suggestNewMealPlan } from '@/ai/flows/suggest-new-meal-plan';
 import { updateSingleMeal } from '@/ai/flows/update-single-meal';
 import type { MealItems, MealPlan, MealType } from '@/lib/types';
-import { useLocalStorage } from '@/hooks/use-local-storage';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Header } from '@/components/Header';
 import { MealPlanDisplay } from '@/components/MealPlanDisplay';
@@ -13,20 +12,14 @@ import { MealManager } from '@/components/MealManager';
 import { useToast } from '@/hooks/use-toast';
 import Loading from './loading';
 import { getMealItems, saveMealItems } from '@/services/meal-items';
+import { getMealPlan, saveMealPlan } from '@/services/meal-plan';
 import { differenceInDays, startOfToday } from 'date-fns';
-
-const MEAL_PLAN_STORAGE_KEY = 'mealwhiz-plan';
-const PLAN_START_DATE_KEY = 'mealwhiz-plan-start-date';
 
 export default function MealWhizPage() {
   const { toast } = useToast();
   const [mealItems, setMealItems] = React.useState<MealItems | null>(null);
-  const [mealPlan, setMealPlan] = useLocalStorage<MealPlan>(
-    MEAL_PLAN_STORAGE_KEY,
-    []
-  );
-  const [planStartDate, setPlanStartDate] = useLocalStorage<string | null>(
-    PLAN_START_DATE_KEY,
+  const [mealPlan, setMealPlan] = React.useState<MealPlan | null>(null);
+  const [planStartDate, setPlanStartDate] = React.useState<string | null>(
     null
   );
 
@@ -38,6 +31,19 @@ export default function MealWhizPage() {
     mealType: MealType;
   } | null>(null);
 
+  const handleSavePlan = React.useCallback(async (plan: MealPlan, startDate: Date) => {
+    try {
+        await saveMealPlan({ plan, startDate: startDate.toISOString() });
+    } catch (error) {
+        console.error('Failed to save meal plan:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not save your meal plan. Your changes might not be persisted.',
+        });
+    }
+  }, [toast]);
+
   const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
     setIsGeneratingPlan(true);
     try {
@@ -48,13 +54,15 @@ export default function MealWhizPage() {
         snackItems: currentMealItems.Snack,
         numberOfDays: 14,
       });
+      const newStartDate = startOfToday();
       setMealPlan(newPlan);
-      setPlanStartDate(startOfToday().toISOString());
+      setPlanStartDate(newStartDate.toISOString());
+      await handleSavePlan(newPlan, newStartDate);
 
       if (!isInitial) {
         toast({
           title: 'New Meal Plan Generated!',
-          description: 'Your two-week meal plan has been refreshed.',
+          description: 'Your two-week meal plan has been refreshed and saved.',
         });
       }
     } catch (error) {
@@ -67,7 +75,7 @@ export default function MealWhizPage() {
     } finally {
       setIsGeneratingPlan(false);
     }
-  }, [setMealPlan, setPlanStartDate, toast]);
+  }, [handleSavePlan, toast]);
 
   React.useEffect(() => {
     setIsClient(true);
@@ -76,25 +84,23 @@ export default function MealWhizPage() {
       const items = await getMealItems();
       setMealItems(items);
       
-      const storedPlanString = localStorage.getItem(MEAL_PLAN_STORAGE_KEY);
-      const storedPlan = storedPlanString ? JSON.parse(storedPlanString) : [];
-      const storedStartDate = localStorage.getItem(PLAN_START_DATE_KEY);
+      const storedPlanData = await getMealPlan();
 
-      if (storedPlan.length === 0 || !storedStartDate) {
+      if (!storedPlanData || storedPlanData.plan.length === 0 || !storedPlanData.startDate) {
         await handleGenerateNewPlan(items, true); 
       } else {
-        setMealPlan(storedPlan);
-        setPlanStartDate(JSON.parse(storedStartDate));
+        setMealPlan(storedPlanData.plan);
+        setPlanStartDate(storedPlanData.startDate);
       }
       
       setIsLoading(false);
     }
     loadInitialData();
-  }, [handleGenerateNewPlan, setMealPlan, setPlanStartDate]);
+  }, [handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
-      if (!mealItems) return;
+      if (!mealItems || !mealPlan || !planStartDate) return;
       setIsUpdatingMeal({ dayIndex, mealType });
       try {
         const availableMeals = mealItems[mealType];
@@ -115,6 +121,8 @@ export default function MealWhizPage() {
         });
 
         setMealPlan(updatedPlan);
+        await handleSavePlan(updatedPlan, new Date(planStartDate));
+
         toast({
           title: `${mealType} Updated!`,
           description: `A new ${mealType.toLowerCase()} has been selected.`,
@@ -130,7 +138,7 @@ export default function MealWhizPage() {
         setIsUpdatingMeal(null);
       }
     },
-    [mealItems, mealPlan, setMealPlan, toast]
+    [mealItems, mealPlan, planStartDate, toast, handleSavePlan]
   );
 
   const handleMealItemsChange = async (newItems: MealItems) => {
@@ -152,7 +160,7 @@ export default function MealWhizPage() {
     }
   };
   
-  if (!isClient || isLoading || !mealItems) {
+  if (!isClient || isLoading || !mealItems || !mealPlan) {
     return <Loading />;
   }
 

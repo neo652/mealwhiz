@@ -17,3 +17,8 @@ export interface MealItems {
   Dinner: Meal[];
   Snack: Meal[];
 }
+
+export interface MealPlanData {
+    plan: MealPlan;
+    startDate: string;
+}
