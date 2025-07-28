@@ -5,52 +5,41 @@ import { suggestNewMealPlan } from '@/ai/flows/suggest-new-meal-plan';
 import { updateSingleMeal } from '@/ai/flows/update-single-meal';
 import type { MealItems, MealPlan, MealType } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { INITIAL_MEAL_ITEMS } from '@/lib/data';
-import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { Header } from '@/components/Header';
 import { MealPlanDisplay } from '@/components/MealPlanDisplay';
 import { MealManager } from '@/components/MealManager';
 import { useToast } from '@/hooks/use-toast';
 import Loading from './loading';
+import { getMealItems, saveMealItems } from '@/services/meal-items';
 
-const MEAL_ITEMS_STORAGE_KEY = 'mealwhiz-items';
 const MEAL_PLAN_STORAGE_KEY = 'mealwhiz-plan';
 
 export default function MealWhizPage() {
   const { toast } = useToast();
-  const [mealItems, setMealItems] = useLocalStorage<MealItems>(
-    MEAL_ITEMS_STORAGE_KEY,
-    INITIAL_MEAL_ITEMS
-  );
+  const [mealItems, setMealItems] = React.useState<MealItems | null>(null);
   const [mealPlan, setMealPlan] = useLocalStorage<MealPlan>(
     MEAL_PLAN_STORAGE_KEY,
     []
   );
 
   const [isClient, setIsClient] = React.useState(false);
-  const [isLoadingPlan, setIsLoadingPlan] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
   const [isUpdatingMeal, setIsUpdatingMeal] = React.useState<{
     dayIndex: number;
     mealType: MealType;
   } | null>(null);
 
-  React.useEffect(() => {
-    setIsClient(true);
-    if (mealPlan.length === 0) {
-      handleGenerateNewPlan(true);
-    } else {
-      setIsLoadingPlan(false);
-    }
-  }, []);
 
-  const handleGenerateNewPlan = React.useCallback(async (isInitial = false) => {
-    setIsLoadingPlan(true);
+  const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
+    setIsGeneratingPlan(true);
     try {
       const newPlan = await suggestNewMealPlan({
-        breakfastItems: mealItems.Breakfast,
-        lunchItems: mealItems.Lunch,
-        dinnerItems: mealItems.Dinner,
-        snackItems: mealItems.Snack,
+        breakfastItems: currentMealItems.Breakfast,
+        lunchItems: currentMealItems.Lunch,
+        dinnerItems: currentMealItems.Dinner,
+        snackItems: currentMealItems.Snack,
         numberOfDays: 14,
       });
       setMealPlan(newPlan);
@@ -68,12 +57,34 @@ export default function MealWhizPage() {
         description: 'Could not generate a new meal plan. Please try again.',
       });
     } finally {
-      setIsLoadingPlan(false);
+      setIsGeneratingPlan(false);
     }
-  }, [mealItems, setMealPlan, toast]);
+  }, [setMealPlan, toast]);
+
+  React.useEffect(() => {
+    setIsClient(true);
+    async function loadInitialData() {
+      setIsLoading(true);
+      const items = await getMealItems();
+      setMealItems(items);
+      
+      const storedPlanString = localStorage.getItem(MEAL_PLAN_STORAGE_KEY);
+      const storedPlan = storedPlanString ? JSON.parse(storedPlanString) : [];
+
+      if (storedPlan.length === 0) {
+        await handleGenerateNewPlan(items, true); 
+      } else {
+        setMealPlan(storedPlan);
+      }
+      
+      setIsLoading(false);
+    }
+    loadInitialData();
+  }, [handleGenerateNewPlan, setMealPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
+      if (!mealItems) return;
       setIsUpdatingMeal({ dayIndex, mealType });
       try {
         const availableMeals = mealItems[mealType];
@@ -112,15 +123,26 @@ export default function MealWhizPage() {
     [mealItems, mealPlan, setMealPlan, toast]
   );
 
-  const handleMealItemsChange = (newItems: MealItems) => {
+  const handleMealItemsChange = async (newItems: MealItems) => {
     setMealItems(newItems);
-    toast({
-      title: 'Meal List Updated',
-      description: 'Your changes have been saved.',
-    });
+    try {
+      await saveMealItems(newItems);
+      toast({
+        title: 'Meal List Updated',
+        description: 'Your changes have been saved to the cloud.',
+      });
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: 'Save Error',
+        description: 'Could not save your meal list. Please try again.',
+      });
+      const oldItems = await getMealItems();
+      setMealItems(oldItems);
+    }
   };
   
-  if (!isClient) {
+  if (!isClient || isLoading || !mealItems) {
     return <Loading />;
   }
 
@@ -130,15 +152,15 @@ export default function MealWhizPage() {
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
           <Header
-            onNewPlanClick={() => handleGenerateNewPlan()}
-            loading={isLoadingPlan}
+            onNewPlanClick={() => handleGenerateNewPlan(mealItems)}
+            loading={isGeneratingPlan}
           />
           <main className="flex-1 p-4 md:p-6">
             <MealPlanDisplay
               plan={mealPlan}
               onUpdateMeal={handleUpdateSingleMeal}
               updatingMeal={isUpdatingMeal}
-              loading={isLoadingPlan}
+              loading={isGeneratingPlan || isLoading}
             />
           </main>
         </div>
