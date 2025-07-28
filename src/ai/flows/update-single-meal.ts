@@ -55,14 +55,14 @@ const updateSingleMealPrompt = ai.definePrompt({
   output: {
     schema: MealSchema,
   },
-  prompt: `You are a meal suggestion assistant. Your task is to suggest a different meal.
+  prompt: `You are a meal suggestion assistant. Your task is to suggest a different meal from the provided list.
 
-Follow these instructions:
+Follow these instructions strictly:
 1.  You will be given a list of available meals for a specific meal type (e.g., Breakfast).
 2.  You will also be given the current meal that needs to be replaced.
-3.  Your response MUST be a single meal item from the provided list.
+3.  Your response MUST be a single meal item from the provided list of available meals.
 4.  The suggested meal MUST NOT be the same as the current meal ('{{currentMeal}}').
-5.  Pick one item from the list below and return only its name.
+5.  Pick one item from the list below and return only its name. Do not return any other text.
 
 Available meals for {{mealType}}:
 {{#each availableMeals}}

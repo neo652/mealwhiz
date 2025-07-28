@@ -56,15 +56,34 @@ const suggestNewMealPlanPrompt = ai.definePrompt({
         Snack: z.string().describe('Suggested snack item for the day.'),
     })),
   },
-  prompt: `You are a meal planning assistant. Generate a {{numberOfDays}}-day meal plan.
+  prompt: `You are a meal planning assistant. Your task is to generate a {{numberOfDays}}-day meal plan using ONLY the items provided.
 
-Available Breakfast Items: {{breakfastItems}}
-Available Lunch Items: {{lunchItems}}
-Available Dinner Items: {{dinnerItems}}
-Available Snack Items: {{snackItems}}
+Follow these instructions strictly:
+1.  You will be given lists of available items for Breakfast, Lunch, Dinner, and Snacks.
+2.  For each day in the plan, you MUST select one item from each list for the corresponding meal type.
+3.  Do not use any meal items that are not in the provided lists.
+4.  Try not to repeat meals too often within the {{numberOfDays}}-day period.
+5.  Return the meal plan as a JSON array of objects. Each object must represent a day and have keys "Breakfast", "Lunch", "Dinner", and "Snack".
 
-Create a {{numberOfDays}}-day plan where each day has one item from each category. Try not to repeat meals too often.
-Return the meal plan as a JSON array of objects. Each object should represent a day and have keys "Breakfast", "Lunch", "Dinner", and "Snack".
+Available Breakfast Items:
+{{#each breakfastItems}}
+- {{{this}}}
+{{/each}}
+
+Available Lunch Items:
+{{#each lunchItems}}
+- {{{this}}}
+{{/each}}
+
+Available Dinner Items:
+{{#each dinnerItems}}
+- {{{this}}}
+{{/each}}
+
+Available Snack Items:
+{{#each snackItems}}
+- {{{this}}}
+{{/each}}
 `,
 });
 
