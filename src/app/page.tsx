@@ -12,7 +12,7 @@ import { MealManager } from '@/components/MealManager';
 import { useToast } from '@/hooks/use-toast';
 import Loading from './loading';
 import { getMealItems, saveMealItems } from '@/services/meal-items';
-import { getMealPlan, saveMealPlan } from '@/services/meal-plan';
+import { getLatestMealPlan, saveMealPlan } from '@/services/meal-plan';
 import { differenceInDays, startOfToday } from 'date-fns';
 
 export default function MealWhizPage() {
@@ -84,7 +84,7 @@ export default function MealWhizPage() {
       const items = await getMealItems();
       setMealItems(items);
       
-      const storedPlanData = await getMealPlan();
+      const storedPlanData = await getLatestMealPlan();
 
       if (!storedPlanData || storedPlanData.plan.length === 0 || !storedPlanData.startDate) {
         await handleGenerateNewPlan(items, true); 
