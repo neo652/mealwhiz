@@ -87,23 +87,29 @@ const updateSingleMealFlow = ai.defineFlow(
     const currentMeal = mealPlan[dayIndex][mealType];
     const filteredMeals = availableMeals.filter(m => m !== currentMeal);
 
-    const { output: newMeal } = await updateSingleMealPrompt({
-      currentMeal: currentMeal,
-      mealType: mealType,
-      availableMeals: filteredMeals.length > 0 ? filteredMeals : availableMeals,
-    });
+    let newMeal: string | null = null;
+    try {
+        const { output } = await updateSingleMealPrompt({
+          currentMeal: currentMeal,
+          mealType: mealType,
+          availableMeals: filteredMeals.length > 0 ? filteredMeals : availableMeals,
+        });
+        newMeal = output;
+    } catch (e) {
+        console.error("Error getting meal suggestion from AI, using fallback.", e);
+        // Error is expected if model returns nothing, so we'll fall through to the fallback.
+    }
+    
+    // Create a copy of the meal plan to avoid modifying the original directly
+    const updatedMealPlan = JSON.parse(JSON.stringify(mealPlan));
 
     if (!newMeal) {
         // Fallback: if the model returns nothing, pick a random one from the filtered list.
-        const fallbackMeal = filteredMeals[Math.floor(Math.random() * filteredMeals.length)];
-        const updatedMealPlan = JSON.parse(JSON.stringify(mealPlan));
+        const fallbackOptions = filteredMeals.length > 0 ? filteredMeals : availableMeals;
+        const fallbackMeal = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
         updatedMealPlan[dayIndex][mealType] = fallbackMeal;
         return updatedMealPlan;
     }
-
-
-    // Create a copy of the meal plan to avoid modifying the original directly
-    const updatedMealPlan = JSON.parse(JSON.stringify(mealPlan));
 
     // Update the specific meal in the copied meal plan
     updatedMealPlan[dayIndex][mealType] = newMeal;
