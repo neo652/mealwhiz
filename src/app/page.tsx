@@ -5,7 +5,7 @@ import { suggestNewMealPlan } from '@/ai/flows/suggest-new-meal-plan';
 import { updateSingleMeal } from '@/ai/flows/update-single-meal';
 import type { MealItems, MealPlan, MealType } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Header } from '@/components/Header';
 import { MealPlanDisplay } from '@/components/MealPlanDisplay';
 import { MealManager } from '@/components/MealManager';
