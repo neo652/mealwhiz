@@ -34,7 +34,8 @@ export async function getMealItems(): Promise<MealItems> {
 export async function saveMealItems(mealItems: MealItems): Promise<void> {
     const userId = auth.currentUser?.uid;
     if (!userId) {
-        throw new Error("User not authenticated. Cannot save meal items.");
+        console.warn("User not authenticated. Cannot save meal items.");
+        return;
     }
 
     try {

@@ -45,6 +45,10 @@ function MealWhizContent() {
   }, [toast]);
 
   const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate a plan without a user session.' });
+      return;
+    }
     setIsGeneratingPlan(true);
     try {
       const newStartDate = startOfToday();
@@ -77,20 +81,25 @@ function MealWhizContent() {
     } finally {
       setIsGeneratingPlan(false);
     }
-  }, [handleSavePlan, toast]);
+  }, [handleSavePlan, toast, user]);
 
   React.useEffect(() => {
     async function loadInitialData() {
-      if (authLoading) return; // Wait for auth state to be resolved
-
+      if (!user) {
+        // Still waiting for auth, but we can load the initial items.
+        const items = await getMealItems();
+        setMealItems(items);
+        setIsLoading(false); // Stop loading to show the UI
+        return;
+      }
+      
       setIsLoading(true);
       const items = await getMealItems();
       setMealItems(items);
       
       const storedPlanData = await getLatestMealPlan();
       
-      // We need a user to generate a new plan if one doesn't exist.
-      if ((!storedPlanData || storedPlanData.plan.length < 14) && user) {
+      if ((!storedPlanData || storedPlanData.plan.length < 14)) {
         await handleGenerateNewPlan(items, true);
       } else if (storedPlanData) {
         setMealPlan(storedPlanData.plan);
@@ -100,7 +109,7 @@ function MealWhizContent() {
       setIsLoading(false);
     }
     loadInitialData();
-  }, [user, authLoading, handleGenerateNewPlan]);
+  }, [user, handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
@@ -125,12 +134,8 @@ function MealWhizContent() {
         });
 
         setMealPlan(updatedPlan);
-
-        // Instead of saving the whole plan, just save the updated day
-        if (updatedPlan.length > dayIndex) {
-            const dailyPlanToSave = updatedPlan[dayIndex];
-            await handleSavePlan([dailyPlanToSave], new Date(dailyPlanToSave.date));
-        }
+        
+        await handleSavePlan(updatedPlan, new Date(planStartDate));
        
         toast({
           title: `${mealType} Updated!`,
@@ -168,7 +173,7 @@ function MealWhizContent() {
     }
   };
   
-  if (isLoading || !mealItems) {
+  if (authLoading || !mealItems) {
     return <Loading />;
   }
 
