@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import { suggestNewMealPlan } from '@/ai/flows/suggest-new-meal-plan';
+import { updateSingleMeal } from '@/ai/flows/update-single-meal';
 import type { DailyPlan, Meal, MealItems, MealPlan, MealType } from '@/lib/types';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Header } from '@/components/Header';
@@ -25,6 +26,7 @@ function MealWhizContent() {
   
   const [isLoading, setIsLoading] = React.useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
+  const [isUpdatingMeal, setIsUpdatingMeal] = React.useState<string | null>(null);
   
   const handleSavePlan = React.useCallback(async (plan: MealPlan, startDate: Date) => {
     if (!user) {
@@ -43,7 +45,7 @@ function MealWhizContent() {
     }
   }, [toast, user]);
 
-  const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
+  const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems) => {
     if (!user || !currentMealItems) {
       toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate a plan. Please wait a moment and try again.' });
       return;
@@ -64,12 +66,11 @@ function MealWhizContent() {
       setPlanStartDate(newStartDate.toISOString());
       await handleSavePlan(newPlan, newStartDate);
 
-      if (!isInitial) {
-        toast({
-          title: 'New Meal Plan Generated!',
-          description: 'Your two-week meal plan has been refreshed and saved.',
-        });
-      }
+      toast({
+        title: 'New Meal Plan Generated!',
+        description: 'Your two-week meal plan has been refreshed and saved.',
+      });
+
     } catch (error) {
       console.error('Failed to generate new meal plan:', error);
       toast({
@@ -97,7 +98,7 @@ function MealWhizContent() {
                 setPlanStartDate(storedPlanData.startDate);
             } else {
                 // If no plan exists, generate one automatically.
-                await handleGenerateNewPlan(items, true);
+                await handleGenerateNewPlan(items);
             }
         } catch (error) {
             console.error("Error during initial data load:", error);
@@ -111,12 +112,12 @@ function MealWhizContent() {
             setIsLoading(false);
         }
     }
-    if (!authLoading) {
+    if (!authLoading && user) {
       loadData();
     }
   }, [user, authLoading, toast, handleGenerateNewPlan]);
 
-  const handleUpdateSingleMeal = React.useCallback(
+  const handleUpdateMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType, newMeal: Meal) => {
       if (!mealPlan || !planStartDate || !user) return;
 
@@ -132,6 +133,44 @@ function MealWhizContent() {
       });
     },
     [mealPlan, planStartDate, handleSavePlan, user, toast]
+  );
+  
+  const handleRefreshSingleMeal = React.useCallback(
+    async (dayIndex: number, mealType: MealType) => {
+      if (!mealPlan || !planStartDate || !user || !mealItems) return;
+
+      const updateKey = `${dayIndex}-${mealType}`;
+      setIsUpdatingMeal(updateKey);
+      try {
+        const currentMeal = mealPlan[dayIndex][mealType];
+        const availableMealsForType = mealItems[mealType];
+        
+        const { meal: newMeal } = await updateSingleMeal({
+          availableMeals: availableMealsForType,
+          currentMeal: currentMeal,
+        });
+
+        if (newMeal && newMeal !== currentMeal) {
+          await handleUpdateMeal(dayIndex, mealType, newMeal);
+        } else {
+           toast({
+            variant: 'destructive',
+            title: 'No alternative found',
+            description: `Could not find a different meal for ${mealType}.`,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to refresh meal:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: `Could not refresh the ${mealType.toLowerCase()}. Please try again.`,
+        });
+      } finally {
+        setIsUpdatingMeal(null);
+      }
+    },
+    [mealPlan, planStartDate, user, mealItems, handleUpdateMeal, toast]
   );
 
   const handleMealItemsChange = async (newItems: MealItems) => {
@@ -181,7 +220,9 @@ function MealWhizContent() {
                 startDate={planStartDate ? new Date(planStartDate) : new Date()}
                 todayIndex={todayIndex}
                 availableMeals={mealItems}
-                onUpdateMeal={handleUpdateSingleMeal}
+                onUpdateMeal={handleUpdateMeal}
+                onRefreshMeal={handleRefreshSingleMeal}
+                isUpdatingMeal={isUpdatingMeal}
                 loading={isGeneratingPlan || authLoading}
               />
           </main>

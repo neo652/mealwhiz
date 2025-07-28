@@ -15,6 +15,8 @@ interface MealPlanDisplayProps {
   todayIndex: number;
   availableMeals: MealItems;
   onUpdateMeal: (dayIndex: number, mealType: MealType, newMeal: Meal) => void;
+  onRefreshMeal: (dayIndex: number, mealType: MealType) => void;
+  isUpdatingMeal: string | null;
   loading: boolean;
 }
 
@@ -30,7 +32,10 @@ const LoadingSkeleton = () => (
                     <Skeleton className="h-4 w-1/4 mb-1" />
                     <Skeleton className="h-5 w-4/5" />
                 </div>
-                <Skeleton className="h-8 w-8 ml-4" />
+                <div className="flex items-center gap-1">
+                    <Skeleton className="h-8 w-8" />
+                    <Skeleton className="h-8 w-8" />
+                </div>
             </div>
           ))}
         </div>
@@ -44,6 +49,8 @@ export function MealPlanDisplay({
   todayIndex,
   availableMeals,
   onUpdateMeal,
+  onRefreshMeal,
+  isUpdatingMeal,
   loading,
 }: MealPlanDisplayProps) {
 
@@ -80,6 +87,8 @@ export function MealPlanDisplay({
               date={date}
               plan={dailyPlan}
               onUpdateMeal={onUpdateMeal}
+              onRefreshMeal={onRefreshMeal}
+              isUpdatingMeal={isUpdatingMeal}
               availableMeals={availableMeals}
               isToday={dayIndex === todayIndex}
               dayIndex={dayIndex}
