@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { MealPlan, MealType } from '@/lib/types';
+import type { Meal, MealItems, MealPlan, MealType } from '@/lib/types';
 import { MealDayCard } from './MealDayCard';
 import { Card } from './ui/card';
 import { Skeleton } from './ui/skeleton';
@@ -13,8 +13,8 @@ interface MealPlanDisplayProps {
   plan: MealPlan;
   startDate: Date;
   todayIndex: number;
-  onUpdateMeal: (dayIndex: number, mealType: MealType) => void;
-  updatingMeal: { dayIndex: number; mealType: MealType } | null;
+  availableMeals: MealItems;
+  onUpdateMeal: (dayIndex: number, mealType: MealType, newMeal: Meal) => void;
   loading: boolean;
 }
 
@@ -42,8 +42,8 @@ export function MealPlanDisplay({
   plan,
   startDate,
   todayIndex,
+  availableMeals,
   onUpdateMeal,
-  updatingMeal,
   loading,
 }: MealPlanDisplayProps) {
 
@@ -80,7 +80,7 @@ export function MealPlanDisplay({
               date={date}
               plan={dailyPlan}
               onUpdateMeal={onUpdateMeal}
-              updatingMeal={updatingMeal}
+              availableMeals={availableMeals}
               isToday={dayIndex === todayIndex}
               dayIndex={dayIndex}
             />

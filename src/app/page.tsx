@@ -3,8 +3,7 @@
 
 import * as React from 'react';
 import { suggestNewMealPlan } from '@/ai/flows/suggest-new-meal-plan';
-import { updateSingleMeal } from '@/ai/flows/update-single-meal';
-import type { DailyPlan, MealItems, MealPlan, MealType } from '@/lib/types';
+import type { DailyPlan, Meal, MealItems, MealPlan, MealType } from '@/lib/types';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Header } from '@/components/Header';
 import { MealPlanDisplay } from '@/components/MealPlanDisplay';
@@ -26,11 +25,7 @@ function MealWhizContent() {
   
   const [isLoading, setIsLoading] = React.useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
-  const [isUpdatingMeal, setIsUpdatingMeal] = React.useState<{
-    dayIndex: number;
-    mealType: MealType;
-  } | null>(null);
-
+  
   const handleSavePlan = React.useCallback(async (plan: MealPlan, startDate: Date) => {
     if (!user) {
         console.warn("Save requested, but user is not authenticated.");
@@ -122,47 +117,21 @@ function MealWhizContent() {
   }, [user, authLoading, toast, handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
-    async (dayIndex: number, mealType: MealType) => {
-      if (!mealItems || !mealPlan || !planStartDate || !user) return;
-      setIsUpdatingMeal({ dayIndex, mealType });
-      try {
-        const availableMeals = mealItems[mealType];
-        if (availableMeals.length < 2) {
-          toast({
-            variant: 'destructive',
-            title: 'Not enough options',
-            description: `Please add more ${mealType} items to get a new suggestion.`,
-          });
-          return;
-        }
+    async (dayIndex: number, mealType: MealType, newMeal: Meal) => {
+      if (!mealPlan || !planStartDate || !user) return;
 
-        const updatedPlan = await updateSingleMeal({
-          mealPlan,
-          dayIndex,
-          mealType,
-          availableMeals,
-        });
-
-        setMealPlan(updatedPlan);
-        
-        await handleSavePlan(updatedPlan, new Date(planStartDate));
-       
-        toast({
-          title: `${mealType} Updated!`,
-          description: `A new ${mealType.toLowerCase()} has been selected.`,
-        });
-      } catch (error) {
-        console.error('Failed to update meal:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: `Could not suggest a new ${mealType.toLowerCase()}.`,
-        });
-      } finally {
-        setIsUpdatingMeal(null);
-      }
+      const updatedPlan = JSON.parse(JSON.stringify(mealPlan));
+      updatedPlan[dayIndex][mealType] = newMeal;
+      
+      setMealPlan(updatedPlan);
+      await handleSavePlan(updatedPlan, new Date(planStartDate));
+     
+      toast({
+        title: `${mealType} Updated!`,
+        description: `'${newMeal}' has been set for ${mealType.toLowerCase()}.`,
+      });
     },
-    [mealItems, mealPlan, planStartDate, toast, handleSavePlan, user]
+    [mealPlan, planStartDate, handleSavePlan, user, toast]
   );
 
   const handleMealItemsChange = async (newItems: MealItems) => {
@@ -211,8 +180,8 @@ function MealWhizContent() {
                 plan={mealPlan}
                 startDate={planStartDate ? new Date(planStartDate) : new Date()}
                 todayIndex={todayIndex}
+                availableMeals={mealItems}
                 onUpdateMeal={handleUpdateSingleMeal}
-                updatingMeal={isUpdatingMeal}
                 loading={isGeneratingPlan || authLoading}
               />
           </main>
