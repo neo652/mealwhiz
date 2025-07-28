@@ -15,31 +15,6 @@ import { getMealItems, saveMealItems } from '@/services/meal-items';
 import { getLatestMealPlan, saveMealPlan } from '@/services/meal-plan';
 import { differenceInDays, startOfToday } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
-import { Loader2, UtensilsCrossed } from 'lucide-react';
-
-const WelcomeScreen = ({ onGenerate, loading }: { onGenerate: () => void; loading: boolean }) => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-center p-4">
-      <UtensilsCrossed className="h-16 w-16 text-primary mb-6" />
-      <h1 className="text-4xl font-bold font-headline text-foreground mb-2">Welcome to MealWhiz</h1>
-      <p className="text-lg text-muted-foreground mb-8 max-w-md">
-        Your intelligent meal planning assistant. Let's create a personalized two-week meal plan for you.
-      </p>
-      <Button
-        size="lg"
-        onClick={onGenerate}
-        disabled={loading}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg transition-transform transform hover:scale-105"
-      >
-        {loading ? (
-          <Loader2 className="animate-spin" />
-        ) : (
-          <span>Generate My First Meal Plan</span>
-        )}
-      </Button>
-    </div>
-);
-
 
 function MealWhizContent() {
   const { toast } = useToast();
@@ -74,7 +49,7 @@ function MealWhizContent() {
   }, [toast, user]);
 
   const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
-    if (!user) {
+    if (!user || !currentMealItems) {
       toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate a plan. Please wait a moment and try again.' });
       return;
     }
@@ -126,7 +101,8 @@ function MealWhizContent() {
                 setMealPlan(storedPlanData.plan);
                 setPlanStartDate(storedPlanData.startDate);
             } else {
-                setMealPlan(null);
+                // If no plan exists, generate one automatically.
+                await handleGenerateNewPlan(items, true);
             }
         } catch (error) {
             console.error("Error during initial data load:", error);
@@ -143,7 +119,7 @@ function MealWhizContent() {
     if (!authLoading) {
       loadData();
     }
-  }, [user, authLoading, toast]);
+  }, [user, authLoading, toast, handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
@@ -211,17 +187,8 @@ function MealWhizContent() {
     }
   };
   
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || !mealPlan || !mealItems) {
     return <Loading />;
-  }
-
-  if (!mealPlan) {
-    return (
-        <WelcomeScreen 
-            onGenerate={() => handleGenerateNewPlan(mealItems!, true)} 
-            loading={isGeneratingPlan || !mealItems}
-        />
-    );
   }
 
   const todayIndex = planStartDate
@@ -232,7 +199,7 @@ function MealWhizContent() {
 
   return (
     <SidebarProvider>
-      <MealManager items={mealItems!} onChange={handleMealItemsChange} />
+      <MealManager items={mealItems} onChange={handleMealItemsChange} />
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
           <Header
