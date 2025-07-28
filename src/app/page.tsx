@@ -18,12 +18,11 @@ import { useAuth } from '@/hooks/use-auth';
 
 function MealWhizContent() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
   const [mealItems, setMealItems] = React.useState<MealItems | null>(null);
   const [mealPlan, setMealPlan] = React.useState<MealPlan | null>(null);
-  const [planStartDate, setPlanStartDate] = React.useState<string | null>(
-    null
-  );
+  const [planStartDate, setPlanStartDate] = React.useState<string | null>(null);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
@@ -34,14 +33,14 @@ function MealWhizContent() {
 
   const handleSavePlan = React.useCallback(async (plan: MealPlan, startDate: Date) => {
     try {
-        await saveMealPlan({ plan, startDate: startDate.toISOString() });
+      await saveMealPlan({ plan, startDate: startDate.toISOString() });
     } catch (error) {
-        console.error('Failed to save meal plan:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Could not save your meal plan. Your changes might not be persisted.',
-        });
+      console.error('Failed to save meal plan:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not save your meal plan. Your changes might not be persisted.',
+      });
     }
   }, [toast]);
 
@@ -82,25 +81,26 @@ function MealWhizContent() {
 
   React.useEffect(() => {
     async function loadInitialData() {
-        if (!user) return; // Wait for user to be authenticated
+      if (authLoading) return; // Wait for auth state to be resolved
 
-        setIsLoading(true);
-        const items = await getMealItems();
-        setMealItems(items);
-        
-        const storedPlanData = await getLatestMealPlan();
-
-        if (!storedPlanData || storedPlanData.plan.length < 14) {
-            await handleGenerateNewPlan(items, true); 
-        } else {
-            setMealPlan(storedPlanData.plan);
-            setPlanStartDate(storedPlanData.startDate);
-        }
-        
-        setIsLoading(false);
+      setIsLoading(true);
+      const items = await getMealItems();
+      setMealItems(items);
+      
+      const storedPlanData = await getLatestMealPlan();
+      
+      // We need a user to generate a new plan if one doesn't exist.
+      if ((!storedPlanData || storedPlanData.plan.length < 14) && user) {
+        await handleGenerateNewPlan(items, true);
+      } else if (storedPlanData) {
+        setMealPlan(storedPlanData.plan);
+        setPlanStartDate(storedPlanData.startDate);
+      }
+      
+      setIsLoading(false);
     }
     loadInitialData();
-  }, [user, handleGenerateNewPlan]);
+  }, [user, authLoading, handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
@@ -126,9 +126,10 @@ function MealWhizContent() {
 
         setMealPlan(updatedPlan);
 
+        // Instead of saving the whole plan, just save the updated day
         if (updatedPlan.length > dayIndex) {
             const dailyPlanToSave = updatedPlan[dayIndex];
-            await saveMealPlan({ plan: [dailyPlanToSave], startDate: new Date(dailyPlanToSave.date).toISOString() });
+            await handleSavePlan([dailyPlanToSave], new Date(dailyPlanToSave.date));
         }
        
         toast({
@@ -146,7 +147,7 @@ function MealWhizContent() {
         setIsUpdatingMeal(null);
       }
     },
-    [mealItems, mealPlan, planStartDate, toast]
+    [mealItems, mealPlan, planStartDate, toast, handleSavePlan]
   );
 
   const handleMealItemsChange = async (newItems: MealItems) => {
@@ -155,7 +156,7 @@ function MealWhizContent() {
       await saveMealItems(newItems);
       toast({
         title: 'Meal List Updated',
-        description: 'Your changes have been saved to the cloud.',
+        description: 'Your changes have been saved.',
       });
     } catch (error) {
        toast({
@@ -163,11 +164,11 @@ function MealWhizContent() {
         title: 'Save Error',
         description: 'Could not save your meal list. Please try again.',
       });
-      console.error("Error saving meal items, could not revert.", error);
+      console.error("Error saving meal items:", error);
     }
   };
   
-  if (isLoading || !mealItems || !mealPlan) {
+  if (isLoading || !mealItems) {
     return <Loading />;
   }
 
@@ -185,14 +186,22 @@ function MealWhizContent() {
             loading={isGeneratingPlan}
           />
           <main className="flex-1 p-4 md:p-6">
-            <MealPlanDisplay
-              plan={mealPlan}
-              startDate={planStartDate ? new Date(planStartDate) : new Date()}
-              todayIndex={todayIndex}
-              onUpdateMeal={handleUpdateSingleMeal}
-              updatingMeal={isUpdatingMeal}
-              loading={isGeneratingPlan || isLoading}
-            />
+            {mealPlan ? (
+              <MealPlanDisplay
+                plan={mealPlan}
+                startDate={planStartDate ? new Date(planStartDate) : new Date()}
+                todayIndex={todayIndex}
+                onUpdateMeal={handleUpdateSingleMeal}
+                updatingMeal={isUpdatingMeal}
+                loading={isGeneratingPlan || isLoading}
+              />
+            ) : (
+                <div className="flex items-center justify-center h-64 bg-secondary rounded-lg">
+                    <p className="text-muted-foreground">
+                    Generating your initial meal plan...
+                    </p>
+              </div>
+            )}
           </main>
         </div>
       </SidebarInset>
@@ -200,12 +209,7 @@ function MealWhizContent() {
   );
 }
 
+// The main page component that handles the auth state
 export default function MealWhizPage() {
-    const { user, loading: authLoading } = useAuth();
-
-    if (authLoading || !user) {
-        return <Loading />;
-    }
-
     return <MealWhizContent />;
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { auth, onAuthStateChanged, signInAnonymously, type User } from '@/lib/fi
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
+  loading: boolean; // We still need loading to know when auth state is resolved.
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,6 +22,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
+        setLoading(false);
       } else {
         try {
           const userCredential = await signInAnonymously(auth);
@@ -28,9 +30,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (error) {
           console.error("Anonymous sign-in failed:", error);
           setUser(null);
+        } finally {
+            setLoading(false);
         }
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
