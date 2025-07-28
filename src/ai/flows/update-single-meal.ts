@@ -42,6 +42,34 @@ export async function updateSingleMeal(input: UpdateSingleMealInput): Promise<Up
   return updateSingleMealFlow(input);
 }
 
+const updateSingleMealPrompt = ai.definePrompt({
+  name: 'updateSingleMealPrompt',
+  input: {
+    schema: z.object({
+      currentMeal: MealSchema,
+      mealType: MealTypeSchema,
+      availableMeals: z.array(MealSchema),
+    }),
+  },
+  output: {
+    schema: MealSchema,
+  },
+  prompt: `You are a meal suggestion assistant. Your task is to suggest a different meal.
+
+Follow these instructions:
+1.  You will be given a list of available meals for a specific meal type (e.g., Breakfast).
+2.  You will also be given the current meal that needs to be replaced.
+3.  Your response MUST be a single meal item from the provided list.
+4.  The suggested meal MUST NOT be the same as the current meal ('{{currentMeal}}').
+5.  Pick one item from the list below and return only its name.
+
+Available meals for {{mealType}}:
+{{#each availableMeals}}
+- {{{this}}}
+{{/each}}
+`,
+});
+
 const updateSingleMealFlow = ai.defineFlow(
   {
     name: 'updateSingleMealFlow',
@@ -56,41 +84,29 @@ const updateSingleMealFlow = ai.defineFlow(
       availableMeals,
     } = input;
 
-    const prompt = ai.definePrompt({
-      name: 'updateSingleMealPrompt',
-      input: {
-        schema: z.object({
-          currentMeal: MealSchema,
-          mealType: MealTypeSchema,
-          availableMeals: z.array(MealSchema),
-        }),
-      },
-      output: {
-        schema: MealSchema,
-      },
-      prompt: `Given the following list of available meals for {{mealType}}:
+    const currentMeal = mealPlan[dayIndex][mealType];
+    const filteredMeals = availableMeals.filter(m => m !== currentMeal);
 
-      {{#each availableMeals}}
-      - {{{this}}}
-      {{/each}}
-
-      Suggest a different meal to replace the current meal. The new meal must not be '{{currentMeal}}'.
-
-      Current meal: {{{currentMeal}}}
-      `,
-    });
-
-    const { output: newMeal } = await prompt({
-      currentMeal: mealPlan[dayIndex][mealType],
+    const { output: newMeal } = await updateSingleMealPrompt({
+      currentMeal: currentMeal,
       mealType: mealType,
-      availableMeals: availableMeals.filter(m => m !== mealPlan[dayIndex][mealType]),
+      availableMeals: filteredMeals.length > 0 ? filteredMeals : availableMeals,
     });
+
+    if (!newMeal) {
+        // Fallback: if the model returns nothing, pick a random one from the filtered list.
+        const fallbackMeal = filteredMeals[Math.floor(Math.random() * filteredMeals.length)];
+        const updatedMealPlan = JSON.parse(JSON.stringify(mealPlan));
+        updatedMealPlan[dayIndex][mealType] = fallbackMeal;
+        return updatedMealPlan;
+    }
+
 
     // Create a copy of the meal plan to avoid modifying the original directly
     const updatedMealPlan = JSON.parse(JSON.stringify(mealPlan));
 
     // Update the specific meal in the copied meal plan
-    updatedMealPlan[dayIndex][mealType] = newMeal!;
+    updatedMealPlan[dayIndex][mealType] = newMeal;
 
     return updatedMealPlan;
   }
