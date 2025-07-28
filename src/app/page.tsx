@@ -126,7 +126,6 @@ function MealWhizContent() {
                 setMealPlan(storedPlanData.plan);
                 setPlanStartDate(storedPlanData.startDate);
             } else {
-                // Explicitly set to null if no plan is found to show welcome screen.
                 setMealPlan(null);
             }
         } catch (error) {
@@ -136,6 +135,7 @@ function MealWhizContent() {
                 title: 'Loading Error',
                 description: 'Could not load your data. Please refresh the page.',
             });
+            setMealPlan(null);
         } finally {
             setIsLoading(false);
         }
@@ -228,7 +228,7 @@ function MealWhizContent() {
     ? differenceInDays(startOfToday(), new Date(planStartDate))
     : -1;
 
-  const isDataReady = !authLoading && !isLoading && mealItems && mealPlan;
+  const isDataReady = !authLoading && mealItems && mealPlan;
 
   return (
     <SidebarProvider>
@@ -246,7 +246,7 @@ function MealWhizContent() {
                 todayIndex={todayIndex}
                 onUpdateMeal={handleUpdateSingleMeal}
                 updatingMeal={isUpdatingMeal}
-                loading={isGeneratingPlan || isLoading || authLoading}
+                loading={isGeneratingPlan || authLoading}
               />
           </main>
         </div>

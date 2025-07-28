@@ -17,14 +17,14 @@ export async function getLatestMealPlan(): Promise<MealPlanData | null> {
     try {
         const userDailyPlansCollection = collection(db, 'users', userId, DAILY_MEALS_COLLECTION);
 
-        const q = query(userDailyPlansCollection, orderBy("date", "desc"), limit(14));
+        const q = query(userDailyPlansCollection, orderBy("date", "asc"), limit(14));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
             return null;
         }
         
-        const dailyPlans: DailyPlan[] = querySnapshot.docs.map(doc => doc.data() as DailyPlan).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const dailyPlans: DailyPlan[] = querySnapshot.docs.map(doc => doc.data() as DailyPlan);
 
         if (dailyPlans.length === 0) {
             return null;
