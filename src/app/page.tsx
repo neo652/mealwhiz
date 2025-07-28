@@ -32,6 +32,11 @@ function MealWhizContent() {
   } | null>(null);
 
   const handleSavePlan = React.useCallback(async (plan: MealPlan, startDate: Date) => {
+    if (!user) {
+        // This should not happen if the UI is disabled correctly, but as a safeguard.
+        console.warn("Save requested, but user is not authenticated.");
+        return;
+    }
     try {
       await saveMealPlan({ plan, startDate: startDate.toISOString() });
     } catch (error) {
@@ -42,11 +47,11 @@ function MealWhizContent() {
         description: 'Could not save your meal plan. Your changes might not be persisted.',
       });
     }
-  }, [toast]);
+  }, [toast, user]);
 
   const handleGenerateNewPlan = React.useCallback(async (currentMealItems: MealItems, isInitial = false) => {
     if (!user) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate a plan without a user session.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Cannot generate a plan. Please wait a moment and try again.' });
       return;
     }
     setIsGeneratingPlan(true);
@@ -84,36 +89,30 @@ function MealWhizContent() {
   }, [handleSavePlan, toast, user]);
 
   React.useEffect(() => {
-    async function loadInitialData() {
-      if (!user) {
-        // Still waiting for auth, but we can load the initial items.
+    async function loadData() {
+        if (authLoading) return; // Wait for authentication to resolve.
+
+        setIsLoading(true);
         const items = await getMealItems();
         setMealItems(items);
-        setIsLoading(false); // Stop loading to show the UI
-        return;
-      }
-      
-      setIsLoading(true);
-      const items = await getMealItems();
-      setMealItems(items);
-      
-      const storedPlanData = await getLatestMealPlan();
-      
-      if ((!storedPlanData || storedPlanData.plan.length < 14)) {
-        await handleGenerateNewPlan(items, true);
-      } else if (storedPlanData) {
-        setMealPlan(storedPlanData.plan);
-        setPlanStartDate(storedPlanData.startDate);
-      }
-      
-      setIsLoading(false);
+
+        if (user) {
+            const storedPlanData = await getLatestMealPlan();
+            if ((!storedPlanData || storedPlanData.plan.length < 14)) {
+                await handleGenerateNewPlan(items, true);
+            } else if (storedPlanData) {
+                setMealPlan(storedPlanData.plan);
+                setPlanStartDate(storedPlanData.startDate);
+            }
+        }
+        setIsLoading(false);
     }
-    loadInitialData();
-  }, [user, handleGenerateNewPlan]);
+    loadData();
+  }, [user, authLoading, handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
-      if (!mealItems || !mealPlan || !planStartDate) return;
+      if (!mealItems || !mealPlan || !planStartDate || !user) return;
       setIsUpdatingMeal({ dayIndex, mealType });
       try {
         const availableMeals = mealItems[mealType];
@@ -152,11 +151,15 @@ function MealWhizContent() {
         setIsUpdatingMeal(null);
       }
     },
-    [mealItems, mealPlan, planStartDate, toast, handleSavePlan]
+    [mealItems, mealPlan, planStartDate, toast, handleSavePlan, user]
   );
 
   const handleMealItemsChange = async (newItems: MealItems) => {
     setMealItems(newItems);
+     if (!user) {
+        console.warn("User not authenticated. Cannot save meal items yet.");
+        return;
+    }
     try {
       await saveMealItems(newItems);
       toast({
@@ -173,7 +176,7 @@ function MealWhizContent() {
     }
   };
   
-  if (authLoading || !mealItems) {
+  if (authLoading || isLoading) {
     return <Loading />;
   }
 
@@ -183,12 +186,12 @@ function MealWhizContent() {
 
   return (
     <SidebarProvider>
-      <MealManager items={mealItems} onChange={handleMealItemsChange} />
+      <MealManager items={mealItems!} onChange={handleMealItemsChange} />
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
           <Header
-            onNewPlanClick={() => handleGenerateNewPlan(mealItems)}
-            loading={isGeneratingPlan}
+            onNewPlanClick={() => mealItems && handleGenerateNewPlan(mealItems)}
+            loading={isGeneratingPlan || !user}
           />
           <main className="flex-1 p-4 md:p-6">
             {mealPlan ? (
@@ -198,7 +201,7 @@ function MealWhizContent() {
                 todayIndex={todayIndex}
                 onUpdateMeal={handleUpdateSingleMeal}
                 updatingMeal={isUpdatingMeal}
-                loading={isGeneratingPlan || isLoading}
+                loading={isGeneratingPlan || isLoading || !user}
               />
             ) : (
                 <div className="flex items-center justify-center h-64 bg-secondary rounded-lg">
@@ -218,3 +221,5 @@ function MealWhizContent() {
 export default function MealWhizPage() {
     return <MealWhizContent />;
 }
+
+    

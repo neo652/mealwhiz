@@ -1,7 +1,7 @@
 
 'use server';
 
-import { collection, doc, getDocs, limit, orderBy, query, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, orderBy, query, writeBatch } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import type { DailyPlan, MealPlan, MealPlanData } from '@/lib/types';
 
@@ -10,7 +10,6 @@ const DAILY_MEALS_COLLECTION = 'daily-meals';
 export async function getLatestMealPlan(): Promise<MealPlanData | null> {
     const userId = auth.currentUser?.uid;
     if (!userId) {
-      // This can happen if called before auth is complete, return null and let the UI handle it.
        console.warn("User not authenticated yet in getLatestMealPlan. Returning null.");
       return null;
     }
@@ -46,6 +45,7 @@ export async function saveMealPlan(mealPlanData: MealPlanData): Promise<void> {
     const userId = auth.currentUser?.uid;
     if (!userId) {
         console.warn("User not authenticated. Cannot save meal plan.");
+        // Instead of throwing, we just return. The UI should prevent this.
         return;
     }
     
@@ -71,3 +71,5 @@ export async function saveMealPlan(mealPlanData: MealPlanData): Promise<void> {
         throw new Error("Could not save meal plan.");
     }
 }
+
+    

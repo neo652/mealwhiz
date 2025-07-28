@@ -22,6 +22,7 @@ export async function getMealItems(): Promise<MealItems> {
         if (docSnap.exists()) {
             return docSnap.data() as MealItems;
         } else {
+            // Pre-warm the database for a new user
             await setDoc(docRef, INITIAL_MEAL_ITEMS);
             return INITIAL_MEAL_ITEMS;
         }
@@ -35,6 +36,7 @@ export async function saveMealItems(mealItems: MealItems): Promise<void> {
     const userId = auth.currentUser?.uid;
     if (!userId) {
         console.warn("User not authenticated. Cannot save meal items.");
+        // Instead of throwing, we just return. The UI should prevent this.
         return;
     }
 
@@ -46,3 +48,5 @@ export async function saveMealItems(mealItems: MealItems): Promise<void> {
         throw new Error("Could not save meal items.");
     }
 }
+
+    
