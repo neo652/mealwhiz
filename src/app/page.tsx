@@ -15,6 +15,31 @@ import { getMealItems, saveMealItems } from '@/services/meal-items';
 import { getLatestMealPlan, saveMealPlan } from '@/services/meal-plan';
 import { differenceInDays, startOfToday } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
+import { Loader2, UtensilsCrossed } from 'lucide-react';
+
+const WelcomeScreen = ({ onGenerate, loading }: { onGenerate: () => void; loading: boolean }) => (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-center p-4">
+      <UtensilsCrossed className="h-16 w-16 text-primary mb-6" />
+      <h1 className="text-4xl font-bold font-headline text-foreground mb-2">Welcome to MealWhiz</h1>
+      <p className="text-lg text-muted-foreground mb-8 max-w-md">
+        Your intelligent meal planning assistant. Let's create a personalized two-week meal plan for you.
+      </p>
+      <Button
+        size="lg"
+        onClick={onGenerate}
+        disabled={loading}
+        className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg transition-transform transform hover:scale-105"
+      >
+        {loading ? (
+          <Loader2 className="animate-spin" />
+        ) : (
+          <span>Generate My First Meal Plan</span>
+        )}
+      </Button>
+    </div>
+);
+
 
 function MealWhizContent() {
   const { toast } = useToast();
@@ -23,7 +48,7 @@ function MealWhizContent() {
   const [mealItems, setMealItems] = React.useState<MealItems | null>(null);
   const [mealPlan, setMealPlan] = React.useState<MealPlan | null>(null);
   const [planStartDate, setPlanStartDate] = React.useState<string | null>(null);
-
+  
   const [isLoading, setIsLoading] = React.useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = React.useState(false);
   const [isUpdatingMeal, setIsUpdatingMeal] = React.useState<{
@@ -89,20 +114,18 @@ function MealWhizContent() {
 
   React.useEffect(() => {
     async function loadData() {
-        if (!user) return; // Wait for user to be available
+        if (!user) return; 
 
-        setIsLoading(true);
         try {
             const items = await getMealItems();
             setMealItems(items);
-
+            
             const storedPlanData = await getLatestMealPlan();
-            if ((!storedPlanData || storedPlanData.plan.length < 14)) {
-                await handleGenerateNewPlan(items, true);
-            } else if (storedPlanData) {
+            if (storedPlanData && storedPlanData.plan.length > 0) {
                 setMealPlan(storedPlanData.plan);
                 setPlanStartDate(storedPlanData.startDate);
             }
+            // If there's no stored plan, we now wait for the user to click the button on the Welcome Screen.
         } catch (error) {
             console.error("Error during initial data load:", error);
             toast({
@@ -115,7 +138,7 @@ function MealWhizContent() {
         }
     }
     loadData();
-  }, [user, handleGenerateNewPlan, toast]);
+  }, [user, toast]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
@@ -183,8 +206,17 @@ function MealWhizContent() {
     }
   };
   
-  if (authLoading || (isLoading && !mealPlan)) {
+  if (authLoading || isLoading) {
     return <Loading />;
+  }
+
+  if (!mealPlan) {
+    return (
+        <WelcomeScreen 
+            onGenerate={() => handleGenerateNewPlan(mealItems!, true)} 
+            loading={isGeneratingPlan || !mealItems}
+        />
+    );
   }
 
   const todayIndex = planStartDate
@@ -203,7 +235,6 @@ function MealWhizContent() {
             loading={isGeneratingPlan || !isDataReady}
           />
           <main className="flex-1 p-4 md:p-6">
-            {mealPlan ? (
               <MealPlanDisplay
                 plan={mealPlan}
                 startDate={planStartDate ? new Date(planStartDate) : new Date()}
@@ -212,13 +243,6 @@ function MealWhizContent() {
                 updatingMeal={isUpdatingMeal}
                 loading={isGeneratingPlan || isLoading || authLoading}
               />
-            ) : (
-                <div className="flex items-center justify-center h-64 bg-secondary rounded-lg">
-                    <p className="text-muted-foreground">
-                    Generating your initial meal plan...
-                    </p>
-              </div>
-            )}
           </main>
         </div>
       </SidebarInset>

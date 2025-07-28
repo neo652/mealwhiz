@@ -6,7 +6,7 @@ import { MealDayCard } from './MealDayCard';
 import { Card } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { addDays, format, isWithinInterval } from 'date-fns';
+import { addDays } from 'date-fns';
 import { useMemo } from 'react';
 
 interface MealPlanDisplayProps {
@@ -19,29 +19,23 @@ interface MealPlanDisplayProps {
 }
 
 const LoadingSkeleton = () => (
-  <Card>
-    <div className="p-6">
-      <Skeleton className="h-7 w-1/4 mb-6" />
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-            <Skeleton className="h-10 w-4/5" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-        </div>
-        <div className="flex items-center justify-between">
-            <Skeleton className="h-10 w-4/5" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-        </div>
-        <div className="flex items-center justify-between">
-            <Skeleton className="h-10 w-4/5" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-        </div>
-        <div className="flex items-center justify-between">
-            <Skeleton className="h-10 w-4/5" />
-            <Skeleton className="h-8 w-8 rounded-full" />
+    <Card className="flex flex-col">
+      <div className="p-6">
+        <Skeleton className="h-7 w-3/5 mb-2" />
+        <Skeleton className="h-4 w-2/5 mb-4" />
+        <div className="space-y-3 divide-y divide-border">
+          {Array.from({ length: 4 }).map((_, i) => (
+             <div key={i} className="flex items-center justify-between pt-3">
+                <div className="flex-1">
+                    <Skeleton className="h-4 w-1/4 mb-1" />
+                    <Skeleton className="h-5 w-4/5" />
+                </div>
+                <Skeleton className="h-8 w-8 ml-4" />
+            </div>
+          ))}
         </div>
       </div>
-    </div>
-  </Card>
+    </Card>
 );
 
 export function MealPlanDisplay({
@@ -95,26 +89,6 @@ export function MealPlanDisplay({
       </div>
     );
   };
-
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <LoadingSkeleton key={i} />
-        ))}
-      </div>
-    );
-  }
-
-  if (plan.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 bg-secondary rounded-lg">
-        <p className="text-muted-foreground">
-          Click &quot;Suggest New Plan&quot; to get started!
-        </p>
-      </div>
-    );
-  }
 
   return (
     <Tabs defaultValue={defaultTab} className="w-full">
