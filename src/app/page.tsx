@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/use-auth';
 
 function MealWhizContent() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [mealItems, setMealItems] = React.useState<MealItems | null>(null);
   const [mealPlan, setMealPlan] = React.useState<MealPlan | null>(null);
   const [planStartDate, setPlanStartDate] = React.useState<string | null>(
@@ -81,23 +82,25 @@ function MealWhizContent() {
 
   React.useEffect(() => {
     async function loadInitialData() {
-      setIsLoading(true);
-      const items = await getMealItems();
-      setMealItems(items);
-      
-      const storedPlanData = await getLatestMealPlan();
+        if (!user) return; // Wait for user to be authenticated
 
-      if (!storedPlanData || storedPlanData.plan.length < 14) {
-        await handleGenerateNewPlan(items, true); 
-      } else {
-        setMealPlan(storedPlanData.plan);
-        setPlanStartDate(storedPlanData.startDate);
-      }
-      
-      setIsLoading(false);
+        setIsLoading(true);
+        const items = await getMealItems();
+        setMealItems(items);
+        
+        const storedPlanData = await getLatestMealPlan();
+
+        if (!storedPlanData || storedPlanData.plan.length < 14) {
+            await handleGenerateNewPlan(items, true); 
+        } else {
+            setMealPlan(storedPlanData.plan);
+            setPlanStartDate(storedPlanData.startDate);
+        }
+        
+        setIsLoading(false);
     }
     loadInitialData();
-  }, [handleGenerateNewPlan]);
+  }, [user, handleGenerateNewPlan]);
 
   const handleUpdateSingleMeal = React.useCallback(
     async (dayIndex: number, mealType: MealType) => {
@@ -122,13 +125,12 @@ function MealWhizContent() {
         });
 
         setMealPlan(updatedPlan);
-        const dailyPlanToSave = updatedPlan.find(p => p.date === mealPlan[dayIndex].date);
 
-        if (dailyPlanToSave) {
-             await saveMealPlan({ plan: [dailyPlanToSave], startDate: new Date(dailyPlanToSave.date).toISOString() });
+        if (updatedPlan.length > dayIndex) {
+            const dailyPlanToSave = updatedPlan[dayIndex];
+            await saveMealPlan({ plan: [dailyPlanToSave], startDate: new Date(dailyPlanToSave.date).toISOString() });
         }
        
-
         toast({
           title: `${mealType} Updated!`,
           description: `A new ${mealType.toLowerCase()} has been selected.`,
